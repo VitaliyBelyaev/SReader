@@ -1,26 +1,26 @@
 package ru.vitaliybelyaev.sreader;
 
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
+import android.app.Notification;
+import android.app.PendingIntent;
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
+
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Iterator;
 
-public class MainActivity extends AppCompatActivity implements SensorEventListener {
+import static ru.vitaliybelyaev.sreader.SeriesRepository.ACCELEROMETER;
 
-    private SensorManager sensorManager;
-    private Sensor accelerometer;
+public class MainActivity extends AppCompatActivity
+        implements SeriesRepository.RepositoryListener {
 
-
-    static {
-        System.loadLibrary("native-lib");
-    }
+    private GraphView graphView;
+    private LineGraphSeries<DataPoint> aSeries;
 
 
     @Override
@@ -28,29 +28,52 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        ArrayList<Sensor> sensors = new ArrayList<>();
 
-        sensors.add(sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER));
-        sensors.add(sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE));
-        for (Sensor sensor : sensors) {
 
-            Log.i("SENSORS", "sensor: " + sensor);
+        graphView = findViewById(R.id.graph);
+        aSeries = SeriesRepository.getInstance().getByName(ACCELEROMETER);
+        graphView.addSeries(aSeries);
+
+        graphView.getViewport().setMaxXAxisSize(300);
+        graphView.getViewport().setXAxisBoundsManual(true);
+        graphView.getViewport().setYAxisBoundsManual(true);
+        graphView.getViewport().setMaxX(300);
+        graphView.getViewport().setMaxY(80);
+
+        Intent intent = new Intent(this,SensorService.class);
+        startService(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        SeriesRepository.getInstance().registerListener(this);
+
+        LineGraphSeries<DataPoint> series = SeriesRepository.getInstance().getByName(ACCELEROMETER);
+        Iterator<DataPoint> dataPointIterator = series.getValues(0, 999999999);
+        ArrayList<DataPoint> dpList = new ArrayList<>();
+        while (dataPointIterator.hasNext()) {
+            dpList.add(dataPointIterator.next());
         }
 
-        TextView tv = (TextView) findViewById(R.id.sample_text);
+        DataPoint[] dpArray =  new DataPoint[dpList.size()];
+        for(int i=0;i<dpList.size();i++){
+            dpArray[i] = dpList.get(i);
+            Log.i("DATAPOINT","dp: "+dpArray[i]);
+        }
+        aSeries.resetData(dpArray);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        SeriesRepository.getInstance().unregisterListener();
     }
 
 
     @Override
-    public void onSensorChanged(SensorEvent event) {
-
+    public void onDataPointAdd(DataPoint dataPoint) {
+        aSeries.appendData(dataPoint, true, 300);
     }
 
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-    }
-
-    public native String stringFromJNI();
 }

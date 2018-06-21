@@ -4,7 +4,7 @@
 extern "C" JNIEXPORT jstring
 
 JNICALL
-Java_ru_vitaliybelyaev_sreader_MainActivity_stringFromJNI(
+Java_ru_vitaliybelyaev_sreader_SensorService_stringFromJNI(
         JNIEnv *env,
         jobject /* this */) {
     std::string hello = "Hello from C++";
