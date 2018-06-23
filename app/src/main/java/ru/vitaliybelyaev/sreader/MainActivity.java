@@ -1,26 +1,29 @@
 package ru.vitaliybelyaev.sreader;
 
-import android.app.Notification;
-import android.app.PendingIntent;
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.support.v7.app.AppCompatActivity;
+import android.view.Menu;
+import android.view.MenuItem;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 
+import static ru.vitaliybelyaev.sreader.SensorService.STOP_FOREGROUND;
 import static ru.vitaliybelyaev.sreader.SeriesRepository.ACCELEROMETER;
+import static ru.vitaliybelyaev.sreader.SeriesRepository.GYROSCOPE;
 
 public class MainActivity extends AppCompatActivity
         implements SeriesRepository.RepositoryListener {
 
-    private GraphView graphView;
+    private GraphView aGraphView;
     private LineGraphSeries<DataPoint> aSeries;
+
+    private GraphView gGraphView;
+    private LineGraphSeries<DataPoint> gSeries;
 
 
     @Override
@@ -28,19 +31,19 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        aGraphView = findViewById(R.id.accelerometer_graph);
+        setupGraphView(aGraphView);
+        aSeries = initSeries(ACCELEROMETER);
+        aGraphView.addSeries(aSeries);
 
 
-        graphView = findViewById(R.id.graph);
-        aSeries = SeriesRepository.getInstance().getByName(ACCELEROMETER);
-        graphView.addSeries(aSeries);
+        gGraphView = findViewById(R.id.gyroscope_graph);
+        setupGraphView(gGraphView);
+        gSeries = initSeries(GYROSCOPE);
+        gGraphView.addSeries(gSeries);
 
-        graphView.getViewport().setMaxXAxisSize(300);
-        graphView.getViewport().setXAxisBoundsManual(true);
-        graphView.getViewport().setYAxisBoundsManual(true);
-        graphView.getViewport().setMaxX(300);
-        graphView.getViewport().setMaxY(80);
 
-        Intent intent = new Intent(this,SensorService.class);
+        Intent intent = new Intent(this, SensorService.class);
         startService(intent);
     }
 
@@ -49,19 +52,8 @@ public class MainActivity extends AppCompatActivity
         super.onResume();
         SeriesRepository.getInstance().registerListener(this);
 
-        LineGraphSeries<DataPoint> series = SeriesRepository.getInstance().getByName(ACCELEROMETER);
-        Iterator<DataPoint> dataPointIterator = series.getValues(0, 999999999);
-        ArrayList<DataPoint> dpList = new ArrayList<>();
-        while (dataPointIterator.hasNext()) {
-            dpList.add(dataPointIterator.next());
-        }
-
-        DataPoint[] dpArray =  new DataPoint[dpList.size()];
-        for(int i=0;i<dpList.size();i++){
-            dpArray[i] = dpList.get(i);
-            Log.i("DATAPOINT","dp: "+dpArray[i]);
-        }
-        aSeries.resetData(dpArray);
+        updateGraph(ACCELEROMETER, aSeries);
+        updateGraph(GYROSCOPE, gSeries);
     }
 
     @Override
@@ -70,10 +62,61 @@ public class MainActivity extends AppCompatActivity
         SeriesRepository.getInstance().unregisterListener();
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.controls, menu);
+        return true;
+    }
 
     @Override
-    public void onDataPointAdd(DataPoint dataPoint) {
-        aSeries.appendData(dataPoint, true, 300);
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.stop) {
+            Intent intent = new Intent(this, SensorService.class);
+            intent.putExtra(Intent.EXTRA_TEXT, STOP_FOREGROUND);
+            startService(intent);
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
+
+    @Override
+    public void onDataPointAdd(String sensorKey, DataPoint dataPoint) {
+        if (sensorKey.equals(ACCELEROMETER)) {
+            aSeries.appendData(dataPoint, true, 300);
+        } else if (sensorKey.equals(GYROSCOPE)) {
+            gSeries.appendData(dataPoint, true, 300);
+        }
+
+    }
+
+    private void updateGraph(String sensorKey, LineGraphSeries<DataPoint> sensorSeries) {
+        ArrayList<DataPoint> dpList = SeriesRepository.getInstance().getByName(sensorKey);
+
+        DataPoint[] dpArray = new DataPoint[dpList.size()];
+        for (int i = 0; i < dpList.size(); i++) {
+            dpArray[i] = dpList.get(i);
+        }
+        sensorSeries.resetData(dpArray);
+    }
+
+    private LineGraphSeries<DataPoint> initSeries(String sensorKey) {
+        ArrayList<DataPoint> dpList = SeriesRepository.getInstance().getByName(sensorKey);
+        DataPoint[] dpArray = new DataPoint[dpList.size()];
+        for (int i = 0; i < dpList.size(); i++) {
+            dpArray[i] = dpList.get(i);
+        }
+        return new LineGraphSeries<>(dpArray);
+    }
+
+    private void setupGraphView(GraphView graphView) {
+        graphView.getViewport().setMaxXAxisSize(300);
+        graphView.getViewport().setXAxisBoundsManual(true);
+        graphView.getViewport().setYAxisBoundsManual(true);
+        graphView.getViewport().setMaxX(300);
+        graphView.getViewport().setMaxY(80);
+    }
+
 
 }

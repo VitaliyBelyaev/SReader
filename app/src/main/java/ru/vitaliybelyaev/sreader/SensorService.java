@@ -15,7 +15,6 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
-import android.util.Log;
 
 import com.jjoe64.graphview.series.DataPoint;
 
@@ -23,17 +22,29 @@ import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
 import static ru.vitaliybelyaev.sreader.SeriesRepository.ACCELEROMETER;
+import static ru.vitaliybelyaev.sreader.SeriesRepository.GYROSCOPE;
 
 public class SensorService extends Service implements SensorEventListener {
 
-    private Handler workerHandler;
-    private SensorManager sensorManager;
+    private float periodInSeconds = 1;
+    //we calculate N using desirable period in seconds and sensor fastest delay value
+    private int N = (int) (periodInSeconds / 0.01);
+
     private Sensor lAccelerometer;
-    private float[] values = new float[100];
-    private int counter = 0;
-    private int secondsCounter = 1;
+    private float[] aValues = new float[N];
+    private int aCounter = 0;
+    private int aSecondsCounter = 1;
+
+    private Sensor gyroscope;
+    private float[] gValues = new float[N];
+    private int gCounter = 0;
+    private int gSecondsCounter = 1;
+
+    private SensorManager sensorManager;
+    private Handler workerHandler;
     private static final int SENSOR_NOTIFICATION_ID = 6234;
     private static final String CHANNEL_ID = "sensor_channel";
+    public static final String STOP_FOREGROUND = "stop_service";
 
     static {
         System.loadLibrary("native-lib");
@@ -42,23 +53,28 @@ public class SensorService extends Service implements SensorEventListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        createNotificationChannel();
+        if(intent.hasExtra(Intent.EXTRA_TEXT)){
+            SeriesRepository.getInstance().clear();
+            stopSelf();
+        } else{
+            //this is need for API level 26 and higher
+            createNotificationChannel();
 
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent =
-                PendingIntent.getActivity(this, 0, notificationIntent, 0);
+            Intent notificationIntent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent =
+                    PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setContentTitle("Getting data from sensor")
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setContentIntent(pendingIntent);
+            NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle("Getting data from sensor")
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentIntent(pendingIntent);
 
-        Notification notification = mBuilder.build();
+            Notification notification = mBuilder.build();
 
-        startForeground(SENSOR_NOTIFICATION_ID, notification);
-
-        return START_STICKY;
+            startForeground(SENSOR_NOTIFICATION_ID, notification);
+        }
+        return START_NOT_STICKY;
     }
 
 
@@ -66,11 +82,14 @@ public class SensorService extends Service implements SensorEventListener {
     public void onCreate() {
         super.onCreate();
 
-
         initWorkerThread();
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
         lAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         sensorManager.registerListener(this, lAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
+
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     @Override
@@ -82,21 +101,51 @@ public class SensorService extends Service implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
 
-        float resultLength = findResultLength(event);
-        Log.i("SERVICE","resultLength: "+resultLength);
-        if (counter < 100) {
-            values[counter] = resultLength;
-            counter++;
-        } else {
-            float average = findAverage(values);
-            DataPoint dataPoint = new DataPoint(secondsCounter, average);
-            SeriesRepository.getInstance().saveDataPoint(ACCELEROMETER, dataPoint);
-            secondsCounter++;
+        float resultMagnitude = findResultMagnitude(event);
 
-            counter = 0;
-            values[counter] = resultLength;
-            counter++;
+        if (event.sensor == lAccelerometer) {
+            if (aCounter < N) {
+                aValues[aCounter] = resultMagnitude;
+                aCounter++;
+            } else {
+                workerHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        float average = findAverage(aValues);
+                        DataPoint dataPoint = new DataPoint(aSecondsCounter, average);
+                        SeriesRepository.getInstance().saveDataPoint(ACCELEROMETER, dataPoint);
+                        aSecondsCounter++;
+                    }
+                });
+
+
+                aCounter = 0;
+                aValues[aCounter] = resultMagnitude;
+                aCounter++;
+            }
+        } else if (event.sensor == gyroscope) {
+
+            if (gCounter < N) {
+                gValues[gCounter] = resultMagnitude;
+                gCounter++;
+            } else {
+                workerHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        float average = findAverage(gValues);
+                        DataPoint dataPoint = new DataPoint(gSecondsCounter, average);
+                        SeriesRepository.getInstance().saveDataPoint(GYROSCOPE, dataPoint);
+                        gSecondsCounter++;
+                    }
+                });
+
+
+                gCounter = 0;
+                gValues[gCounter] = resultMagnitude;
+                gCounter++;
+            }
         }
+
     }
 
     @Override
@@ -130,7 +179,7 @@ public class SensorService extends Service implements SensorEventListener {
         return sum / k;
     }
 
-    private float findResultLength(SensorEvent event) {
+    private float findResultMagnitude(SensorEvent event) {
         float xAbs = abs(event.values[0]);
         float yAbs = abs(event.values[1]);
         float zAbs = abs(event.values[2]);
@@ -138,16 +187,14 @@ public class SensorService extends Service implements SensorEventListener {
     }
 
     private void createNotificationChannel() {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is new and not in the support library
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             CharSequence name = "SensorReader";
             String description = "Channel for foreground notification";
             int importance = NotificationManager.IMPORTANCE_DEFAULT;
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
             channel.setDescription(description);
-            // Register the channel with the system; you can't change the importance
-            // or other notification behaviors after this
+
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             notificationManager.createNotificationChannel(channel);
         }
