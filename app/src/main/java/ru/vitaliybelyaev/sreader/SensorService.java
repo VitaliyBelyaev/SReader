@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
+import android.util.Log;
 
 import com.jjoe64.graphview.series.DataPoint;
 
@@ -111,7 +112,9 @@ public class SensorService extends Service implements SensorEventListener {
                 workerHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        float average = findAverage(aValues);
+                        float average = findAverageInC(aValues);
+                        float jAverage = findAverage(aValues);
+                        Log.i("AVERAGE","Java: "+jAverage+", C++: "+average);
                         DataPoint dataPoint = new DataPoint(aSecondsCounter, average);
                         SeriesRepository.getInstance().saveDataPoint(ACCELEROMETER, dataPoint);
                         aSecondsCounter++;
@@ -132,7 +135,7 @@ public class SensorService extends Service implements SensorEventListener {
                 workerHandler.post(new Runnable() {
                     @Override
                     public void run() {
-                        float average = findAverage(gValues);
+                        float average = findAverageInC(gValues);
                         DataPoint dataPoint = new DataPoint(gSecondsCounter, average);
                         SeriesRepository.getInstance().saveDataPoint(GYROSCOPE, dataPoint);
                         gSecondsCounter++;
@@ -201,7 +204,7 @@ public class SensorService extends Service implements SensorEventListener {
     }
 
 
-    public native String stringFromJNI();
+    public native float findAverageInC(float[] values);
 
     @Nullable
     @Override
