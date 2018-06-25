@@ -6,24 +6,25 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import com.jjoe64.graphview.GraphView;
-import com.jjoe64.graphview.series.DataPoint;
-import com.jjoe64.graphview.series.LineGraphSeries;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
 
 import java.util.ArrayList;
 
+import static ru.vitaliybelyaev.sreader.EntriesRepository.ACCELEROMETER;
+import static ru.vitaliybelyaev.sreader.EntriesRepository.GYROSCOPE;
 import static ru.vitaliybelyaev.sreader.SensorService.STOP_FOREGROUND;
-import static ru.vitaliybelyaev.sreader.SeriesRepository.ACCELEROMETER;
-import static ru.vitaliybelyaev.sreader.SeriesRepository.GYROSCOPE;
 
 public class MainActivity extends AppCompatActivity
-        implements SeriesRepository.RepositoryListener {
+        implements EntriesRepository.RepositoryListener {
 
-    private GraphView aGraphView;
-    private LineGraphSeries<DataPoint> aSeries;
+    private LineChart aChart;
+    private LineData aLineData;
 
-    private GraphView gGraphView;
-    private LineGraphSeries<DataPoint> gSeries;
+    private LineChart gChart;
+    private LineData gLineData;
 
 
     @Override
@@ -31,16 +32,20 @@ public class MainActivity extends AppCompatActivity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        aGraphView = findViewById(R.id.accelerometer_graph);
-        setupGraphView(aGraphView);
-        aSeries = initSeries(ACCELEROMETER);
-        aGraphView.addSeries(aSeries);
+        aChart= findViewById(R.id.accelerometer_chart);
+        LineDataSet aDataSet = new LineDataSet(EntriesRepository
+                .getInstance()
+                .getByName(ACCELEROMETER), "Accelerometer");
+        aLineData = new LineData(aDataSet);
+        aChart.setData(aLineData);
 
 
-        gGraphView = findViewById(R.id.gyroscope_graph);
-        setupGraphView(gGraphView);
-        gSeries = initSeries(GYROSCOPE);
-        gGraphView.addSeries(gSeries);
+        gChart = findViewById(R.id.gyroscope_chart);
+        LineDataSet gDataSet = new LineDataSet(EntriesRepository
+                .getInstance()
+                .getByName(GYROSCOPE), "Gyroscope");
+        gLineData = new LineData(gDataSet);
+        gChart.setData(gLineData);
 
 
         Intent intent = new Intent(this, SensorService.class);
@@ -50,16 +55,16 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onResume() {
         super.onResume();
-        SeriesRepository.getInstance().registerListener(this);
+        EntriesRepository.getInstance().registerListener(this);
 
-        updateGraph(ACCELEROMETER, aSeries);
-        updateGraph(GYROSCOPE, gSeries);
+        updateGraph(ACCELEROMETER, aLineData, aChart);
+        updateGraph(GYROSCOPE, gLineData, gChart);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        SeriesRepository.getInstance().unregisterListener();
+        EntriesRepository.getInstance().unregisterListener();
     }
 
     @Override
@@ -82,41 +87,27 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public void onDataPointAdd(String sensorKey, DataPoint dataPoint) {
+    public void onDataPointAdd(String sensorKey, Entry entry) {
         if (sensorKey.equals(ACCELEROMETER)) {
-            aSeries.appendData(dataPoint, true, 300);
+            aLineData.addEntry(entry,0);
+            aChart.notifyDataSetChanged();
+            aChart.invalidate();
         } else if (sensorKey.equals(GYROSCOPE)) {
-            gSeries.appendData(dataPoint, true, 300);
+            gLineData.addEntry(entry,0);
+            gChart.notifyDataSetChanged();
+            gChart.invalidate();
         }
 
     }
 
-    private void updateGraph(String sensorKey, LineGraphSeries<DataPoint> sensorSeries) {
-        ArrayList<DataPoint> dpList = SeriesRepository.getInstance().getByName(sensorKey);
+    private void updateGraph(String sensorKey, LineData sensorLineData, LineChart sensorChart) {
+        ArrayList<Entry> entryList = EntriesRepository.getInstance().getByName(sensorKey);
 
-        DataPoint[] dpArray = new DataPoint[dpList.size()];
-        for (int i = 0; i < dpList.size(); i++) {
-            dpArray[i] = dpList.get(i);
-        }
-        sensorSeries.resetData(dpArray);
+        sensorLineData.removeDataSet(0);
+        LineDataSet dataSet = new LineDataSet(entryList,sensorKey);
+        sensorLineData.addDataSet(dataSet);
+        sensorChart.notifyDataSetChanged();
+        sensorChart.invalidate();
     }
-
-    private LineGraphSeries<DataPoint> initSeries(String sensorKey) {
-        ArrayList<DataPoint> dpList = SeriesRepository.getInstance().getByName(sensorKey);
-        DataPoint[] dpArray = new DataPoint[dpList.size()];
-        for (int i = 0; i < dpList.size(); i++) {
-            dpArray[i] = dpList.get(i);
-        }
-        return new LineGraphSeries<>(dpArray);
-    }
-
-    private void setupGraphView(GraphView graphView) {
-        graphView.getViewport().setMaxXAxisSize(300);
-        graphView.getViewport().setXAxisBoundsManual(true);
-        graphView.getViewport().setYAxisBoundsManual(true);
-        graphView.getViewport().setMaxX(300);
-        graphView.getViewport().setMaxY(80);
-    }
-
 
 }

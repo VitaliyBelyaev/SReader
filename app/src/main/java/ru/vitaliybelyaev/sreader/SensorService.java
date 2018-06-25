@@ -15,15 +15,14 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
-import android.util.Log;
 
-import com.jjoe64.graphview.series.DataPoint;
+import com.github.mikephil.charting.data.Entry;
 
 import static java.lang.Math.abs;
 import static java.lang.Math.pow;
 import static java.lang.Math.sqrt;
-import static ru.vitaliybelyaev.sreader.SeriesRepository.ACCELEROMETER;
-import static ru.vitaliybelyaev.sreader.SeriesRepository.GYROSCOPE;
+import static ru.vitaliybelyaev.sreader.EntriesRepository.ACCELEROMETER;
+import static ru.vitaliybelyaev.sreader.EntriesRepository.GYROSCOPE;
 
 public class SensorService extends Service implements SensorEventListener {
 
@@ -43,6 +42,7 @@ public class SensorService extends Service implements SensorEventListener {
 
     private SensorManager sensorManager;
     private Handler workerHandler;
+    private Handler uiHandler;
     private static final int SENSOR_NOTIFICATION_ID = 6234;
     private static final String CHANNEL_ID = "sensor_channel";
     public static final String STOP_FOREGROUND = "stop_service";
@@ -54,10 +54,10 @@ public class SensorService extends Service implements SensorEventListener {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        if(intent.hasExtra(Intent.EXTRA_TEXT)){
-            SeriesRepository.getInstance().clear();
+        if (intent.hasExtra(Intent.EXTRA_TEXT)) {
+            EntriesRepository.getInstance().clear();
             stopSelf();
-        } else{
+        } else {
             //this is need for API level 26 and higher
             createNotificationChannel();
 
@@ -113,10 +113,14 @@ public class SensorService extends Service implements SensorEventListener {
                     @Override
                     public void run() {
                         float average = findAverageInC(aValues);
-                        float jAverage = findAverage(aValues);
-                        Log.i("AVERAGE","Java: "+jAverage+", C++: "+average);
-                        DataPoint dataPoint = new DataPoint(aSecondsCounter, average);
-                        SeriesRepository.getInstance().saveDataPoint(ACCELEROMETER, dataPoint);
+                        final Entry entry = new Entry(aSecondsCounter, average);
+
+                        uiHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                EntriesRepository.getInstance().saveEntry(ACCELEROMETER, entry);
+                            }
+                        });
                         aSecondsCounter++;
                     }
                 });
@@ -136,8 +140,14 @@ public class SensorService extends Service implements SensorEventListener {
                     @Override
                     public void run() {
                         float average = findAverageInC(gValues);
-                        DataPoint dataPoint = new DataPoint(gSecondsCounter, average);
-                        SeriesRepository.getInstance().saveDataPoint(GYROSCOPE, dataPoint);
+                        final Entry entry = new Entry(gSecondsCounter, average);
+
+                        uiHandler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                EntriesRepository.getInstance().saveEntry(GYROSCOPE, entry);
+                            }
+                        });
                         gSecondsCounter++;
                     }
                 });
@@ -159,28 +169,9 @@ public class SensorService extends Service implements SensorEventListener {
 
     private void initWorkerThread() {
         workerHandler = Workers.getWorkerThread().newWorkerHandler();
+        uiHandler = new Handler(getMainLooper());
     }
 
-    private float findAverage(float[] values) {
-        float min = values[0];
-        float max = values[0];
-        float sum = 0;
-        int m = 0;
-
-        for (int i = 1; i < values.length; i++) {
-            if (values[i] < min) min = values[i];
-            else if (values[i] > max) max = values[i];
-        }
-
-        for (float v : values) {
-            if (v != min && v != max) sum = sum + v;
-            else m = m + 1;
-        }
-
-        //number of element in array without min and max
-        int k = values.length - m;
-        return sum / k;
-    }
 
     private float findResultMagnitude(SensorEvent event) {
         float xAbs = abs(event.values[0]);
