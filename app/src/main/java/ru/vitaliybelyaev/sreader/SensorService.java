@@ -26,19 +26,20 @@ import static ru.vitaliybelyaev.sreader.EntriesRepository.GYROSCOPE;
 
 public class SensorService extends Service implements SensorEventListener {
 
-    private float periodInSeconds = 1;
+    private final float PERIOD_IN_SECONDS= 1;
+
     //we calculate N using desirable period in seconds and sensor fastest delay value
-    private int N = (int) (periodInSeconds / 0.01);
+    private int N = (int) (PERIOD_IN_SECONDS / 0.01);
 
     private Sensor lAccelerometer;
     private float[] aValues = new float[N];
     private int aCounter = 0;
-    private int aSecondsCounter = 1;
+    private float aSecondsCounter = PERIOD_IN_SECONDS;
 
     private Sensor gyroscope;
     private float[] gValues = new float[N];
     private int gCounter = 0;
-    private int gSecondsCounter = 1;
+    private float gSecondsCounter = PERIOD_IN_SECONDS;
 
     private SensorManager sensorManager;
     private Handler workerHandler;
@@ -66,8 +67,8 @@ public class SensorService extends Service implements SensorEventListener {
                     PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
             NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.drawable.ic_launcher_foreground)
-                    .setContentTitle("Getting data from sensor")
+                    .setSmallIcon(R.drawable.ic_chart_notifcation_icon)
+                    .setContentTitle(getString(R.string.notificationTitle))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setContentIntent(pendingIntent);
 
@@ -121,7 +122,7 @@ public class SensorService extends Service implements SensorEventListener {
                                 EntriesRepository.getInstance().saveEntry(ACCELEROMETER, entry);
                             }
                         });
-                        aSecondsCounter++;
+                        aSecondsCounter = aSecondsCounter + PERIOD_IN_SECONDS;
                     }
                 });
 
@@ -148,10 +149,9 @@ public class SensorService extends Service implements SensorEventListener {
                                 EntriesRepository.getInstance().saveEntry(GYROSCOPE, entry);
                             }
                         });
-                        gSecondsCounter++;
+                        gSecondsCounter = gSecondsCounter + PERIOD_IN_SECONDS;
                     }
                 });
-
 
                 gCounter = 0;
                 gValues[gCounter] = resultMagnitude;
@@ -193,7 +193,6 @@ public class SensorService extends Service implements SensorEventListener {
             notificationManager.createNotificationChannel(channel);
         }
     }
-
 
     public native float findAverageInC(float[] values);
 

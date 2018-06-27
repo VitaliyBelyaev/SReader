@@ -1,5 +1,13 @@
 <resources>
-    <string name="app_name">SReader</string>
+    <string name="app_name" translatable="false">SReader</string>
 
     <string name="stop">STOP</string>
+
+    <string name="aDescription">Accelerometer</string>
+    <string name="gDescription">Gyroscope</string>
+
+    <string name="aChartLabel">Linear acceleration, m/s²</string>
+    <string name="gChartLabel">Angular velocity, rad/s</string>
+
+    <string name="notificationTitle">Getting data from sensors</string>
 </resources>
