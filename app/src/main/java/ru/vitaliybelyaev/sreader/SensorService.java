@@ -56,6 +56,8 @@ public class SensorService extends Service implements SensorEventListener {
     public int onStartCommand(Intent intent, int flags, int startId) {
 
         if (intent.hasExtra(Intent.EXTRA_TEXT)) {
+            workerHandler.removeCallbacksAndMessages(null);
+            Workers.clear();
             EntriesRepository.getInstance().clear();
             stopSelf();
         } else {

@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name" translatable="false">SReader</string>
 
-    <string name="stop">STOP</string>
+    <string name="stop" translatable="false">STOP</string>
 
     <string name="aDescription">Accelerometer</string>
     <string name="gDescription">Gyroscope</string>

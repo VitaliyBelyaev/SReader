@@ -1,11 +1,21 @@
 package ru.vitaliybelyaev.sreader;
 
 public final class Workers {
-    private Workers(){}
+    private Workers() {
+    }
 
-    private static final WorkerThread workerThread = new WorkerThread("workerThread");
+    private static WorkerThread instance;
 
-    public static WorkerThread getWorkerThread(){
-        return workerThread;
+    public static WorkerThread getWorkerThread() {
+        if (instance == null) {
+            instance = new WorkerThread("workerThread");
+            return instance;
+        }
+        return instance;
+    }
+
+    public static void clear() {
+        instance.quit();
+        instance = null;
     }
 }

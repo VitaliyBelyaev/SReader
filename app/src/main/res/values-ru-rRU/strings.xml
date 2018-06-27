@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SReader</string>
+    <string name="aDescription">Акселерометр</string>
+    <string name="gDescription">Гироскоп</string>
+    <string name="aChartLabel">Линейное ускорение, м/с²</string>
+    <string name="gChartLabel">Угловая скорость, рад/с</string>
+    <string name="notificationTitle">Получаю данные с датчиков</string>
+</resources>

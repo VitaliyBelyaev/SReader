@@ -65,6 +65,11 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.controls, menu);
         return true;
@@ -77,7 +82,7 @@ public class MainActivity extends AppCompatActivity
             Intent intent = new Intent(this, SensorService.class);
             intent.putExtra(Intent.EXTRA_TEXT, STOP_FOREGROUND);
             startService(intent);
-            finish();
+            finishAndRemoveTask();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -108,6 +113,7 @@ public class MainActivity extends AppCompatActivity
                               LineChart sensorChart) {
 
         sensorLineData.clearValues();
+        sensorChart.invalidate();
         ArrayList<Entry> entryList = EntriesRepository.getInstance().getByName(sensorKey);
 
         String label;
